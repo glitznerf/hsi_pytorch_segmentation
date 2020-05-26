@@ -5,6 +5,7 @@ import sys
 import torch
 import numpy as np
 import scipy.io
+from PIL import Image
 import h5py
 from torch.utils.data import random_split, TensorDataset, DataLoader
 
@@ -48,6 +49,19 @@ def split_image(image,gt,size=5):
     print(f"Resizing image of size {image.shape} to patches {images.shape} and grund-truth of size {gt.shape} to ground-truth patches {gts.shape}")
     return images,gts
 
+def augment_image(image,gt,method="orig"):
+    assert method in ["orig","rot","horflip","verflip"]
+    if method == "orig":
+        pass
+    elif method == "rot":
+        image,gt = Image.fromarray(image),Image.fromarray(gt)
+        image,gt = image.rotate(45), gt.rotate(45)
+        image,gt = np.array(image), np.array(gt)
+    elif method == "horflip":
+        image,gt = np.flipud(image), np.flipud(gt)
+    elif method == "verflip":
+        image,gt = np.fliplr(image), np.fliplr(gt)
+    return image,gt
 
 # Creating the PyTorch dataset
 def create_dataset(config):
@@ -66,6 +80,12 @@ def create_dataset(config):
     else:                           # Incorrect image dataframe dimensions
         print(f"Cannot work with images of dimensions {images.shape}.")
         sys.exit()
+
+    for method in config.get("augmentations", []):
+        imgs_aug, gts_aug = augment_image(images,gts,method)
+        images = np.append(images, imgs_aug)
+        gts = np.append(gts, gts_aug)
+
     images,gts = torch.from_numpy(images), torch.from_numpy(gts)    # Transform dataframes to tensors
     data = TensorDataset(images, gts)                               # Create default dataset from tensors
 
