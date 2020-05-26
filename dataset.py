@@ -25,8 +25,6 @@ def mat_dataset(file_name, var_name):             # If the data file is a matlab
         except:                         # Raise exception if neither file assumption is valid
             sys.exit("Cannot load data!")
     image = np.array(f_i[var_name+'_corrected']).astype('uint8')              # Converting imagedata to numpy arrays
-    # print(image)
-    # print(image.shape)
     gt = np.array(f_gt[var_name+'_gt'])                 # Converting gt data to numpy arrays
     return (image,gt)
 
@@ -38,22 +36,33 @@ def mat_dataset(file_name, var_name):             # If the data file is a matlab
 def split_image(image,gt,size=5):
     patches_horizontal = (image.shape[0])//size         # Number of patches on horizontal axis
     patches_vert = patches_horizontal                   # Same for vertical because of square dimensions
-    images = np.zeros((patches_horizontal*patches_vert,5,5,200), dtype=int) # Empty dataframe for image patches
-    gts = np.zeros((patches_horizontal*patches_vert,5,5), dtype=int)        # Empty dataframe for ground-truth patches
+    images = np.zeros((patches_horizontal*patches_vert,200,5,5), dtype=int) # Empty dataframe for image patches
+    gts = np.zeros((patches_horizontal*patches_vert,16,5,5), dtype=int)     # Empty dataframe for ground-truth patches
     i = 0
+    filled = 0
     for hor in range(patches_horizontal):                           # Iterate over horizontal patches
         for vert in range(patches_vert):                            # Iterate over vertical patches
-            images[i] = image[hor*5:(hor+1)*5,vert*5:(vert+1)*5,:]  # Fill image-patches dataframe
-            gts[i] = gt[hor*5:(hor+1)*5,vert*5:(vert+1)*5]          # Fill gt-patches dataframe
+            for layer in range(200):
+                images[i][layer] = image[hor*5:(hor+1)*5,vert*5:(vert+1)*5,layer]  # Fill image-patches dataframe
+                if layer < 16:                                      # Introduce layering to gts
+                    gt_temp = gt[hor*5:(hor+1)*5,vert*5:(vert+1)*5]
+                    gt_temp[gt_temp!=layer+1] = 0                   # Make all pixels zero that aren't of current class
+                    gt_temp[gt_temp>0] = 1                          # Make current class pixels activated (one)
+                    gts[i][layer] = gt_temp                         # Fill gt-patches dataframe
+                    if np.sum(gts[i])>0:                            # Count layers with positive activations
+                        filled += 1
             i += 1
     print(f"Resizing image of size {image.shape} to patches {images.shape} and grund-truth of size {gt.shape} to ground-truth patches {gts.shape}")
+    print(filled, " patches contain some class relation.")
     return images,gts
 
-def augment_image(image,gt,method="orig"):
+def augment_image(image,gt,method="orig"):                          # Augment images by intuitively named methods
     assert method in ["orig","rot","horflip","verflip"]
     if method == "orig":
         pass
     elif method == "rot":
+        image,gt = np.array(image), np.array(gt)
+        print(image.shape, gt.shape)
         image,gt = Image.fromarray(image),Image.fromarray(gt)
         image,gt = image.rotate(45), gt.rotate(45)
         image,gt = np.array(image), np.array(gt)
@@ -81,10 +90,11 @@ def create_dataset(config):
         print(f"Cannot work with images of dimensions {images.shape}.")
         sys.exit()
 
-    for method in config.get("augmentations", []):
-        imgs_aug, gts_aug = augment_image(images,gts,method)
-        images = np.append(images, imgs_aug)
-        gts = np.append(gts, gts_aug)
+    # for method in config.get("augmentations", []):
+    #     imgs_aug, gts_aug = augment_image(images,gts,method)
+    #     images = np.append(images, imgs_aug, axis=0)
+    #     gts = np.append(gts, gts_aug, axis=0)
+    print(images.shape, gts.shape)
 
     images,gts = torch.from_numpy(images), torch.from_numpy(gts)    # Transform dataframes to tensors
     data = TensorDataset(images, gts)                               # Create default dataset from tensors
