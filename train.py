@@ -30,7 +30,8 @@ train_data, test_data = create_dataset(config)
 
 # Fetch model
 def create_model(config):
-    model = load_resnet_model(layers=config.get("layers"), pretrained=config.get("pretrained"), num_classes=config.get("num_classes"))
+    layers, pretrained, num_classes = config.get("layers"), config.get("pretrained"), config.get("num_classes")
+    model = load_resnet_model(layers=layers, pretrained=pretrained, num_classes=num_classes)
     print(model.eval())
     print(f"Using a custom ResNet architecture with bottleneck configuration {layers}, pretrained {pretrained} and {num_classes} classes.")
     return model
@@ -42,17 +43,18 @@ def train_model(model, config, train_data):
     loss_fct = config.get("loss_fct")
 
     net = model.to(device)                                  # Move model to GPU if possible
-    for epoch in range(config.get("epochs",10)):
+    epochs = config.get("epochs",10)
+    for epoch in range(epochs):
         net.train()
         for batch in train_data:
-            x,y = batch[0].to(device), batch[1].to(device)  # Load image and ground truth batch on device
+            x,y = (batch[0].float()).to(device), (batch[1].float()).to(device)  # Load image and ground truth batch on device
             optimizer.zero_grad()                           # Reset parameter gradients
-            output = net(x)                                 # Calculate output of network
+            output = net(x)["out"]                          # Calculate output of network
             loss = loss_fct(output,y)                       # Calculate loss of output
             loss.backward()                                 # Pass loss backwards
             optimizer.step()                                # Optimize for batch
         print("Sample output: ", output[0])
-        print(f"Epoch {epoch}, Loss: {loss}")
+        print(f"Epoch {epoch}/{epochs}, Loss: {loss}")
     return net
 
 
