@@ -2,6 +2,7 @@
 # load_resnet_model(layers, arch_type='fcn', backbone=custom_resnet, pretrained=False, progress=True, num_classes=1, aux_loss=None, **kwargs) is to be used to retrieve a model
 
 # Import necessary dependencies from PyTorch's Torchvision library
+import torch.nn as nn
 from torchvision.models._utils import IntermediateLayerGetter
 from torchvision.models.utils import load_state_dict_from_url
 from torchvision.models.resnet import conv3x3, conv1x1, BasicBlock, Bottleneck, ResNet
@@ -40,6 +41,7 @@ def custom_resnet(layers, pretrained=False, progress=True, arch='resnet', **kwar
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict)
+    model.conv1 = nn.Conv2d(200, 64, kernel_size=7, stride=2, padding=3, bias=False)    # adjust for 200 layers
     return model
 
 
@@ -55,10 +57,7 @@ def build_fcn_resnet(name, backbone_fct, num_classes, aux, layers, pretrained_ba
         pretrained_backbone (bool): If True, returns a model pre-trained on COCO train2017 which
             contains the same classes as Pascal VOC
     """
-    backbone = backbone_fct(
-        layers=layers,
-        pretrained=pretrained_backbone,
-        replace_stride_with_dilation=[False, True, True])
+    backbone = backbone_fct(layers=layers, pretrained=pretrained_backbone, replace_stride_with_dilation=[False, True, True])
 
     return_layers = {'layer4': 'out'}
     if aux:
